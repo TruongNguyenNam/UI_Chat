@@ -1,0 +1,33 @@
+{
+  "name": "chat_app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@primevue/themes": "^4.3.9",
+    "@stomp/stompjs": "^7.2.1",
+    "@tailwindcss/vite": "^4.1.13",
+    "axios": "^1.12.2",
+    "pinia": "^3.0.3",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.3.9",
+    "sockjs-client": "^1.6.1",
+    "tailwindcss": "^4.1.13",
+    "vue": "^3.5.21",
+    "vue-router": "^4.5.1",
+    "vue3-emoji-picker": "^1.1.8"
+  },
+  "devDependencies": {
+    "@types/sockjs-client": "^1.5.4",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "~5.8.3",
+    "vite": "^7.1.7",
+    "vue-tsc": "^3.0.7"
+  }
+}

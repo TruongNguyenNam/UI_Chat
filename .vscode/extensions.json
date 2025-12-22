@@ -1,0 +1,15 @@
+{
+  "recommendations": ["Vue.volar"]
+}
+
+// {
+//   "recommendations": [
+//     "Vue.volar",                  // Vue Language Features (Volar)
+//     "Vue.vscode-typescript-vue-plugin", // TS plugin cho Volar
+//     "esbenp.prettier-vscode",     // Prettier formatter
+//     "dbaeumer.vscode-eslint",     // ESLint
+//     "steoates.autoimport",        // Auto Import
+//     "christian-kohler.path-intellisense", // Path Intellisense
+//     "bradlc.vscode-tailwindcss"   // Tailwind IntelliSense
+//   ]
+// }
