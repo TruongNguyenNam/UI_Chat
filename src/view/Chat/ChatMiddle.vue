@@ -1,220 +1,304 @@
 <template>
-  <div class="flex-1 flex">
-    <div class="flex-1 flex flex-col" style="border: 1px solid red;">
+  <div class="h-full flex">
+    <!-- Phần chat chính -->
+    <div :class="['flex flex-col bg-gray-50 transition-all duration-300', panelOpen ? 'w-full lg:w-[calc(100%-320px)]' : 'w-full']">
       <div v-if="selectedFriend" class="flex flex-col h-full">
         <!-- Header -->
-        <div class="p-4 border-b flex items-center gap-3">
+        <div class="bg-white border-b border-gray-200 px-5 py-4 flex items-center gap-4 shadow-sm">
           <img
-            :src="selectedFriend.avatarUrl"
+            :src="selectedFriend.avatarUrl || '/default-avatar.png'"
             alt="avatar"
-            class="w-10 h-10 rounded-full border"
+            class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-300"
             @error="onImageError"
           />
-          <div>
-            <p class="font-semibold">{{ selectedFriend.fullName }}</p>
+          <div class="flex-1">
+            <p class="font-semibold text-lg text-gray-900">{{ selectedFriend.fullName }}</p>
+            <p class="text-sm text-green-600">Đang hoạt động</p>
           </div>
-
-          <div class="ml-auto">
-            <Button icon="pi pi-phone" size="large" />
-            <Button class="ml-1" icon="pi pi-phone" size="large" />
+          <div class="flex gap-3">
+            <Button icon="pi pi-phone" rounded text severity="secondary" size="large" />
+            <Button icon="pi pi-video" rounded text severity="secondary" size="large" />
+            <Button
+              icon="pi pi-info-circle"
+              rounded
+              text
+              severity="secondary"
+              size="large"
+              :class="panelOpen ? 'bg-blue-100 text-blue-600' : ''"
+              @click="panelOpen = !panelOpen"
+            />
+            <Button icon="pi pi-ellipsis-v" rounded text severity="secondary" size="large" />
           </div>
         </div>
 
-        <!-- Chat content -->
-        <div ref="chatContentRef" class="flex-1 p-4 overflow-y-auto space-y-4">
-          <!-- Loading -->
-          <div v-if="loading" class="flex justify-center items-center h-32">
-            <i class="pi pi-spin pi-spinner text-2xl"></i>
+        <!-- Nội dung tin nhắn -->
+        <div ref="chatContentRef" class="flex-1 overflow-y-auto px-6 py-8 bg-gradient-to-b from-gray-50 to-gray-100">
+          <div v-if="loading" class="flex justify-center items-center h-64">
+            <i class="pi pi-spin pi-spinner text-4xl text-gray-400"></i>
           </div>
 
-          <!-- No messages -->
-          <div
-            v-else-if="messages.length === 0"
-            class="flex flex-col items-center justify-center h-full text-gray-400"
-          >
-            <i class="pi pi-comments text-5xl mb-2"></i>
-            <p>Chưa có tin nhắn nào</p>
+          <div v-else-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-gray-400">
+            <i class="pi pi-comments text-8xl mb-6 opacity-30"></i>
+            <p class="text-xl">Bắt đầu cuộc trò chuyện nào!</p>
           </div>
 
-          <!-- Messages -->
-          <div
-            v-else
-            v-for="message in messages"
-            :key="message.id"
-            :ref="el => setMessageRef(el, message.id)"
-            :class="[
-              'flex transition-all duration-300',
-              message.senderId === currentUserId ? 'justify-end' : 'justify-start',
-              highlightedMessageId === message.id ? 'bg-yellow-100 rounded-lg p-1' : ''
-            ]"
-          >
-            <div class="relative group max-w-[80%]">
-              <div
-                :class="[
-                  'p-3 rounded-lg relative',
-                  message.senderId === currentUserId ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black',
-                  message.isPending ? 'opacity-70' : '',
-                  message.isError ? 'bg-red-100 text-red-900' : '',
-                ]"
-              >
-                <!-- Reply -->
+          <div v-else class="space-y-5">
+            <div
+              v-for="message in messages"
+              :key="message.id"
+              :ref="el => setMessageRef(el, message.id)"
+              :class="['flex items-end gap-3 transition-all duration-300', message.senderId === currentUserId ? 'flex-row-reverse' : 'flex-row']"
+            >
+              <img
+                v-if="message.senderId !== currentUserId"
+                :src="selectedFriend.avatarUrl || '/default-avatar.png'"
+                class="w-9 h-9 rounded-full flex-shrink-0"
+                @error="onImageError"
+              />
+
+              <div class="relative group max-w-2xl">
                 <div
-                  v-if="message.parentMessageId"
-                  class="text-sm border-l-2 pl-2 mb-2 opacity-70 italic cursor-pointer hover:underline"
-                  @click="scrollToParent(message.parentMessageId)"
+                  :class="[
+                    'px-5 py-3 rounded-3xl shadow-md relative break-words',
+                    message.senderId === currentUserId ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none',
+                    message.isPending ? 'opacity-60' : '',
+                    message.isError ? 'bg-red-100 border-red-300' : ''
+                  ]"
                 >
-                  💬 Trả lời: {{ getParentContent(message.parentMessageId) }}
-                </div>
+                  <!-- Trả lời -->
+                  <div v-if="message.parentMessageId" class="mb-3 p-3 bg-black/10 rounded-2xl text-sm cursor-pointer hover:bg-black/20" @click="scrollToParent(message.parentMessageId)">
+                    <span class="opacity-80">↩ Trả lời:</span>
+                    <p class="font-medium mt-1 truncate">{{ getParentContent(message.parentMessageId) }}</p>
+                  </div>
 
-                <!-- Media (nhiều file) -->
-                <div v-if="message.mediaUrl?.length" class="mb-2 grid grid-cols-2 gap-2">
-                  <div v-for="(url, idx) in message.mediaUrl" :key="idx">
+                  <!-- Media -->
+                  <div v-if="message.mediaUrl?.length" class="mb-4">
                     <img
                       v-if="message.messageType === 'IMAGE'"
-                      :src="url"
-                      class="rounded-lg max-w-[180px] cursor-pointer"
-                      @error="onImageError"
-                      @click="openImageModal(url)"
+                      :src="message.mediaUrl[0]"
+                      class="rounded-xl max-w-full cursor-pointer hover:brightness-95 transition"
+                      @click="message.mediaUrl?.[0] ? openImageModal(message.mediaUrl[0]) : null"
+                      @load="onMediaLoad"
                     />
                     <video
                       v-else-if="message.messageType === 'VIDEO'"
-                      :src="url"
+                      :src="message.mediaUrl[0]"
                       controls
-                      class="rounded-lg max-w-[180px]"
-                      @error="onImageError"
-                    ></video>
+                      class="rounded-xl max-w-full"
+                      @loadeddata="onMediaLoad"
+                    />
+                  </div>
+
+                  <!-- Nội dung -->
+                  <div
+                    class="text-base leading-relaxed"
+                    v-html="renderEmoji(message.content || (message.mediaUrl?.length ? 'Đã gửi media' : ''))"
+                  ></div>
+
+                  <!-- Thời gian -->
+                  <div class="flex justify-end items-center gap-2 mt-2 text-xs opacity-70">
+                    {{ formatTime(message.sentAt) }}
+                    <i v-if="message.senderId === currentUserId && !message.isPending && !message.isError" class="pi pi-check-circle"></i>
+                  </div>
+
+                  <!-- Reactions -->
+                  <div v-if="message.reactions?.length" class="absolute -bottom-4 flex gap-1 bg-white rounded-full px-3 py-1.5 shadow-lg border text-lg" :class="message.senderId === currentUserId ? '-left-4' : '-right-4'">
+                    <span v-for="(r, i) in message.reactions" :key="i">{{ r }}</span>
+                    <span class="text-xs text-gray-500 ml-1">{{ message.reactions.length }}</span>
                   </div>
                 </div>
 
-                <!-- Content -->
-                <p>{{ message.content || (message.mediaUrl?.length ? 'Tin nhắn media' : 'Tin nhắn trống') }}</p>
-
-                <!-- Time -->
-                <p class="text-xs mt-1 opacity-70">
-                  {{ formatTime(message.sentAt) }}
-                </p>
-
-                <!-- Reactions -->
-                <div v-if="message.reactions?.length" class="mt-1 flex gap-1 text-sm">
-                  <span
-                    v-for="(r, i) in message.reactions"
-                    :key="i"
-                    class="bg-white/30 rounded px-1"
-                  >
-                    {{ r }}
-                  </span>
-                </div>
-
-                <!-- Pending -->
-                <div v-if="message.isPending" class="absolute -top-2 -right-2">
-                  <i class="pi pi-spin pi-spinner text-xs"></i>
-                </div>
-
-                <!-- Error -->
-                <div v-if="message.isError" class="absolute -top-2 -right-2 flex gap-1">
-                  <i class="pi pi-exclamation-triangle text-red-500 text-xs"></i>
-                  <button @click="retrySend(message)" class="text-red-500 text-xs underline">
-                    Thử lại
+                <!-- Actions -->
+                <div class="absolute top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition" :class="message.senderId === currentUserId ? '-left-14' : '-right-14'">
+                  <button @click="toggleEmojiPicker(message.id)" class="bg-white rounded-full p-2.5 shadow-lg hover:scale-110">
+                    <span class="text-2xl">😊</span>
+                  </button>
+                  <button @click="setReplyMessage(message)" class="bg-white rounded-full p-2.5 shadow-lg hover:scale-110">
+                    <i class="pi pi-reply text-gray-700"></i>
                   </button>
                 </div>
-              </div>
 
-              <!-- Actions -->
-              <div class="absolute -bottom-6 left-0 flex gap-2 opacity-0 group-hover:opacity-100 transition text-gray-500 text-sm">
-                <button @click="toggleEmojiPicker(message.id)">😊</button>
-                <button @click="setReplyMessage(message)">↩️</button>
-              </div>
-
-              <!-- Emoji Picker -->
-              <div v-if="activeEmojiMessageId === message.id" class="absolute z-50 mt-2">
-                <EmojiPicker @select="addReaction($event, message)" theme="light" style="width: 250px" />
+                <!-- Emoji Picker cho reaction -->
+                <div v-if="activeEmojiMessageId === message.id" class="absolute z-50 -top-4 -translate-y-full" :class="message.senderId === currentUserId ? 'right-0' : 'left-0'">
+                  <EmojiPicker @select="addReaction($event, message)" theme="light" :native="true" />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Reply preview -->
-        <div
-          v-if="replyingToMessage"
-          class="border-t border-gray-300 bg-gray-100 p-2 flex justify-between items-center text-sm"
-        >
-          <div class="text-gray-700 truncate">
-            💬 Trả lời: <span class="font-medium">{{ getReplyPreview(replyingToMessage) }}</span>
+        <!-- Preview trả lời -->
+        <div v-if="replyingToMessage" class="mx-6 mb-2 bg-blue-50 border-l-4 border-blue-500 px-4 py-3 rounded-r-lg flex justify-between items-center text-sm">
+          <div class="text-blue-900">
+            <span class="font-semibold">↩ Đang trả lời:</span>
+            <span class="ml-3">{{ getReplyPreview(replyingToMessage) }}</span>
           </div>
-          <Button icon="pi pi-times" class="p-button-text text-red-500" @click="cancelReply" />
+          <Button icon="pi pi-times" text rounded @click="cancelReply" />
         </div>
 
-        <!-- Input -->
-        <div class="p-4 border-t flex items-center gap-2">
-          <InputText
-            v-model="newMessage"
-            placeholder="Nhập tin nhắn..."
-            class="w-full"
-            @keyup.enter="sendMessage"
-            :disabled="sending"
-          />
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            @change="onFileSelect"
-            class="hidden"
-            ref="fileInputRef"
-          />
-          <Button icon="pi pi-microphone" :disabled="sending" />
-          <Button
-            icon="pi pi-paperclip"
-            @click="fileInputRefClick"
-            :disabled="sending || selectedFiles.length > 0"
-          />
-          <Button
-            icon="pi pi-send"
-            @click="sendMessage"
-            :loading="sending"
-            :disabled="!newMessage.trim() && selectedFiles.length === 0"
-          />
-        </div>
+        <!-- Input area -->
+        <div class="bg-white border-t border-gray-200 p-5">
+          <!-- Preview file -->
+          <div v-if="selectedFiles.length > 0" class="mb-4 flex flex-wrap gap-4">
+            <div v-for="(file, idx) in selectedFiles" :key="idx" class="relative group">
+              <img
+                v-if="file.type.startsWith('image/')"
+                :src="previewUrls[idx]"
+                class="w-28 h-28 rounded-2xl object-cover shadow-lg"
+              />
+              <video
+                v-else
+                :src="previewUrls[idx]"
+                class="w-28 h-28 rounded-2xl object-cover shadow-lg"
+                controls
+              />
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-2xl transition flex items-center justify-center">
+                <Button icon="pi pi-times" rounded severity="danger" @click="removeFile(idx)" />
+              </div>
+              <p class="text-xs text-center mt-2 text-gray-600 truncate w-28">{{ file.name }}</p>
+            </div>
+          </div>
 
-        <!-- Preview nhiều file -->
-        <div
-          v-if="selectedFiles.length > 0"
-          class="p-2 border-t bg-gray-100 flex flex-wrap gap-3"
-        >
-          <div v-for="(file, idx) in selectedFiles" :key="idx" class="relative">
-            <img
-              v-if="file.type.startsWith('image/')"
-              :src="previewUrls[idx]"
-              class="w-20 h-20 rounded-lg object-cover"
-            />
-            <video
-              v-else-if="file.type.startsWith('video/')"
-              :src="previewUrls[idx]"
-              class="w-20 h-20 rounded-lg"
-              controls
-            />
+          <div class="flex items-end gap-3">
+            <!-- Nút Emoji (mở picker dưới input) -->
             <Button
-              icon="pi pi-times"
-              class="absolute -top-2 -right-2 p-button-rounded p-button-text text-red-500"
-              @click="removeFile(idx)"
+              icon="pi pi-face-smile"
+              rounded
+              text
+              severity="secondary"
+              size="large"
+              @click="emojiPickerOpen = !emojiPickerOpen"
+              :class="emojiPickerOpen ? 'bg-blue-100 text-blue-600' : ''"
             />
-            <p class="text-xs text-gray-600">{{ file.name }}</p>
+
+            <!-- Nút Attach File -->
+            <Button
+              icon="pi pi-paperclip"
+              rounded
+              text
+              severity="secondary"
+              size="large"
+              @click="fileInputRefClick"
+              :disabled="sending"
+            />
+
+            <!-- Input Text -->
+            <InputText
+              ref="messageInputRef"
+              v-model="newMessage"
+              placeholder="Nhập tin nhắn..."
+              class="flex-1"
+              pt:input:class="py-4 px-6 text-base rounded-full bg-gray-100 focus:bg-white border border-gray-300 focus:border-blue-500 focus:shadow-lg transition"
+              @keyup.enter.exact="sendMessage"
+              @keyup.enter.shift.exact="newMessage += '\n'"
+              :disabled="sending"
+            />
+
+            <!-- Send Button -->
+            <Button
+              icon="pi pi-send"
+              rounded
+              severity="info"
+              size="large"
+              :loading="sending"
+              @click="sendMessage"
+              :disabled="!newMessage.trim() && selectedFiles.length === 0"
+            />
           </div>
+
+          <!-- Emoji Picker dưới input -->
+          <transition name="fade">
+            <div v-if="emojiPickerOpen" class="mt-4">
+              <EmojiPicker @select="addEmojiToInput" theme="light" :native="true" style="width: 100%;" />
+            </div>
+          </transition>
         </div>
       </div>
 
-      <div v-else class="flex items-center justify-center h-full text-gray-400">
-        Hãy chọn một người để bắt đầu chat
+      <!-- Không chọn bạn chat -->
+      <div v-else class="flex-1 flex items-center justify-center text-gray-400">
+        <div class="text-center">
+          <i class="pi pi-comments text-8xl mb-6 opacity-30"></i>
+          <p class="text-2xl">Chọn một người để bắt đầu chat</p>
+        </div>
       </div>
     </div>
+
+    <!-- Panel bên phải -->
+    <div v-if="panelOpen && selectedFriend" class="w-80 bg-white border-l border-gray-200 flex flex-col h-full shadow-xl">
+      <div class="p-6 text-center border-b">
+        <img
+          :src="selectedFriend.avatarUrl || '/default-avatar.png'"
+          class="w-28 h-28 rounded-full mx-auto object-cover ring-4 ring-blue-100 shadow-lg"
+          @error="onImageError"
+        />
+        <p class="mt-4 font-bold text-xl">{{ selectedFriend.fullName }}</p>
+        <p class="text-sm text-gray-500">@{{ selectedFriend.fullName.toLowerCase().replace(/\s/g, '') }}</p>
+
+        <div class="flex justify-center gap-6 mt-6 text-gray-600">
+          <i class="pi pi-phone text-2xl cursor-pointer hover:text-blue-600 transition"></i>
+          <i class="pi pi-video text-2xl cursor-pointer hover:text-blue-600 transition"></i>
+          <i class="pi pi-bell text-2xl cursor-pointer hover:text-gray-800 transition"></i>
+          <i class="pi pi-search text-2xl cursor-pointer hover:text-gray-800 transition"></i>
+        </div>
+      </div>
+
+      <div class="p-4 border-b">
+        <h3 class="font-semibold text-lg mb-3">Tệp đính kèm</h3>
+        <div class="flex gap-2">
+          <button
+            v-for="tab in tabs"
+            :key="tab"
+            @click="activeTab = tab"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition"
+            :class="activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'"
+          >
+            {{ tab }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-4">
+        <div v-if="filteredMedia.length === 0" class="text-center text-gray-400 py-12">
+          Chưa có tệp nào
+        </div>
+
+        <div v-else class="grid grid-cols-3 gap-3">
+          <div v-for="media in displayMedia" :key="media.id" class="relative overflow-hidden rounded-lg cursor-pointer group" @click="openImageModal(media.mediaUrl)">
+            <img v-if="media.mediaType === 'IMAGE'" :src="media.mediaUrl" class="w-full h-28 object-cover transition group-hover:scale-110" />
+            <video v-else-if="media.mediaType === 'VIDEO'" :src="media.mediaUrl" class="w-full h-28 object-cover transition group-hover:scale-110" muted playsinline />
+            <div v-else class="w-full h-28 bg-gray-100 flex items-center justify-center">
+              <i class="pi pi-file text-4xl text-gray-400"></i>
+            </div>
+            <div v-if="media.mediaType === 'VIDEO'" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/30">
+              <i class="pi pi-play-circle text-4xl text-white"></i>
+            </div>
+          </div>
+
+          <div v-if="filteredMedia.length > maxPreview && !showAll" class="h-28 bg-gray-200/80 rounded-lg flex items-center justify-center text-2xl font-bold text-gray-600">
+            +{{ filteredMedia.length - maxPreview }}
+          </div>
+        </div>
+
+        <button v-if="filteredMedia.length > maxPreview" @click="showAll = !showAll" class="mt-6 w-full py-3 border rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2">
+          {{ showAll ? 'Thu gọn' : 'Xem thêm' }}
+          <i :class="showAll ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" accept="image/*,video/*" multiple @change="onFileSelect" class="hidden" ref="fileInputRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from "vue";
+import { ref, watch, onUnmounted, nextTick, computed } from "vue";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import EmojiPicker from "vue3-emoji-picker";
 import "vue3-emoji-picker/css";
+import type { ComponentPublicInstance } from 'vue';
 import type { PropType } from "vue";
 import type { MessageResponseDTO } from "../../model/message/MessageResponseDTO";
 import type { MessageRequestDTO } from "../../model/message/MessageRequestDTO";
@@ -232,71 +316,84 @@ const props = defineProps({
 
 const authStore = useAuthStore();
 const currentUserId = authStore.userId || 0;
-const mediaList = ref<MediaResponseDTO[]>([]);
+
+// State
 const messages = ref<MessageResponseDTO[]>([]);
+const mediaList = ref<MediaResponseDTO[]>([]);
 const newMessage = ref("");
-const activeEmojiMessageId = ref<number | null>(null);
-const fileInputRef = ref<HTMLInputElement | null>(null);
+const sending = ref(false);
+const loading = ref(false);
 const selectedFiles = ref<File[]>([]);
 const previewUrls = ref<string[]>([]);
-const chatContentRef = ref<HTMLElement | null>(null);
-const currentSubId = ref<string | null>(null);
 const replyingToMessage = ref<MessageResponseDTO | null>(null);
+const activeEmojiMessageId = ref<number | null>(null);
 const highlightedMessageId = ref<number | null>(null);
+
+// Refs
+const chatContentRef = ref<HTMLElement | null>(null);
+const messageInputRef = ref<any>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
 const messageRefs = ref<Record<number, HTMLElement>>({});
-const loading = ref(false);
-const sending = ref(false);
+const currentSubId = ref<string | null>(null);
 
-const setMessageRef = (el: HTMLElement | null, id: number) => {
-  if (el) messageRefs.value[id] = el;
-};
+// Panel
+const panelOpen = ref(false);
+const tabs = ["Media", "Link", "Docs"] as const;
+const activeTab = ref<"Media" | "Link" | "Docs">("Media");
+const showAll = ref(false);
+const maxPreview = 9;
 
-// Hàm sort + scroll (gọi mỗi khi messages thay đổi)
-const sortAndScroll = () => {
-  messages.value.sort((a, b) => {
-    const timeA = new Date(a.sentAt).getTime();
-    const timeB = new Date(b.sentAt).getTime();
-    if (timeA !== timeB) return timeA - timeB;
-    return (b.id ?? 0) - (a.id ?? 0); // ổn định thứ tự
+// Emoji picker dưới input
+const emojiPickerOpen = ref(false);
+
+// Scroll
+const scrollToBottomForce = () => {
+  nextTick(() => {
+    if (!chatContentRef.value) return;
+    chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
+    [100, 300, 600, 1000].forEach(d => setTimeout(() => {
+      if (chatContentRef.value) chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
+    }, d));
   });
-
-  setTimeout(() => {
-    if (chatContentRef.value) {
-      chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
-    }
-  }, 50);
 };
 
-watch(
-  () => props.selectedFriend,
-  async (friend) => {
-    messages.value = [];
+const onMediaLoad = () => scrollToBottomForce();
+watch(messages, () => scrollToBottomForce(), { deep: true });
 
-    if (currentSubId.value) {
-      unsubscribe(currentSubId.value);
-      currentSubId.value = null;
-    }
+// Load chat
+watch(() => props.selectedFriend, async (friend) => {
+  messages.value = [];
+  mediaList.value = [];
+  panelOpen.value = false;
+  emojiPickerOpen.value = false;
 
-    if (!friend?.chatId) return;
+  if (currentSubId.value) unsubscribe(currentSubId.value);
 
-    loading.value = true;
-    try {
-      const res = await MessageService.getChatMessages(friend.chatId);
-      messages.value = res.data || [];
+  if (!friend?.chatId) return;
 
-      sortAndScroll();  // Sort và scroll sau khi load
+  const chatId = friend.chatId;
+  loading.value = true;
 
-      subscribeToChat(friend.chatId);
+  try {
+    const [msgRes, mediaRes] = await Promise.all([
+      MessageService.getChatMessages(chatId),
+      MediaService.getAllMediaByChatId(chatId)
+    ]);
 
-      const mediaRes = await MediaService.getAllMediaByChatId(friend.chatId);
-      mediaList.value = mediaRes.data ?? [];
-    } finally {
-      loading.value = false;
-    }
-  },
-  { immediate: true }
-);
+    if (props.selectedFriend?.chatId !== chatId) return;
 
+    messages.value = msgRes.data || [];
+    mediaList.value = mediaRes.data ?? [];
+    scrollToBottomForce();
+    subscribeToChat(chatId);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    if (props.selectedFriend?.chatId === chatId) loading.value = false;
+  }
+}, { immediate: true });
+
+// Gửi tin nhắn
 const sendMessage = async () => {
   if (!props.selectedFriend?.chatId) return;
   if (!newMessage.value.trim() && selectedFiles.value.length === 0) return;
@@ -308,9 +405,7 @@ const sendMessage = async () => {
     chatId: props.selectedFriend.chatId,
     content: newMessage.value.trim(),
     messageType: firstFile
-      ? firstFile.type.startsWith("image/")
-        ? MessageContentType.IMAGE
-        : MessageContentType.VIDEO
+      ? firstFile.type.startsWith("image/") ? MessageContentType.IMAGE : MessageContentType.VIDEO
       : MessageContentType.TEXT,
     parentMessageId: replyingToMessage.value?.id ?? null,
   };
@@ -331,7 +426,7 @@ const sendMessage = async () => {
   };
 
   messages.value.push(optimisticMsg);
-  sortAndScroll();  // Sort và scroll sau khi thêm optimistic
+  scrollToBottomForce();
 
   newMessage.value = "";
   replyingToMessage.value = null;
@@ -341,187 +436,158 @@ const sendMessage = async () => {
     await MessageService.sendMessage(payload, selectedFiles.value);
     optimisticMsg.isPending = false;
     clearPreview();
-  } catch (e) {
+  } catch {
     optimisticMsg.isPending = false;
     optimisticMsg.isError = true;
   } finally {
     sending.value = false;
+    await nextTick();
+    messageInputRef.value?.$el.querySelector('input')?.focus();
   }
 };
 
-const normalizeIncomingMessage = (msg: any): MessageResponseDTO => {
-  return {
-    id: msg.id,
-    chatId: msg.chatId,
-    senderId: msg.senderId,
-    content: msg.content,
-    mediaUrl: msg.mediaUrls || [],
-    messageType: msg.messageType,
-    isRead: msg.isRead,
-    sentAt: new Date(msg.sentAt),
-    reactions: msg.reactions || [],
-    parentMessageId: msg.parentMessageId,
-    deleted: msg.deleted,
-    isPending: false,
-    isError: false,
-  };
+// Thêm emoji vào ô nhập
+const addEmojiToInput = (emoji: any) => {
+  const native = emoji.i || emoji.native || emoji;
+  newMessage.value += native;
+  emojiPickerOpen.value = false;
+  nextTick(() => messageInputRef.value?.$el.querySelector('input')?.focus());
 };
 
+// WebSocket
+const normalizeIncomingMessage = (msg: any): MessageResponseDTO => ({
+  id: msg.id,
+  chatId: msg.chatId,
+  senderId: msg.senderId,
+  content: msg.content,
+  mediaUrl: msg.mediaUrls || [],
+  messageType: msg.messageType,
+  isRead: msg.isRead,
+  sentAt: new Date(msg.sentAt),
+  reactions: msg.reactions || [],
+  parentMessageId: msg.parentMessageId,
+  deleted: msg.deleted,
+  isPending: false,
+  isError: false,
+});
+
 const subscribeToChat = (chatId: number) => {
-   const topic = `/topic/chat/${chatId}`;
-
+  const topic = `/topic/chat/${chatId}`;
   currentSubId.value = subscribe(topic, (stompMsg) => {
-    const body = JSON.parse(stompMsg.body);
-    const incoming = normalizeIncomingMessage(body);
+    const incoming = normalizeIncomingMessage(JSON.parse(stompMsg.body));
 
+    // Thay thế optimistic message
     if (incoming.senderId === currentUserId) {
-      const pendingIndex = messages.value.findIndex(
-        (m) => m.isPending && m.senderId === currentUserId
-      );
-
-      if (pendingIndex !== -1) {
-        messages.value[pendingIndex] = incoming;
-        sortAndScroll();  // Sort và scroll sau khi replace
+      const idx = messages.value.findIndex(m => m.id < 0 || m.isPending);
+      if (idx !== -1) {
+        messages.value[idx] = { ...incoming, isPending: false, isError: false };
+        scrollToBottomForce();
         return;
       }
     }
 
-    const existingIndex = messages.value.findIndex((m) => m.id === incoming.id);
-    if (existingIndex === -1) {
-      messages.value.push(incoming);
-    } else {
-      messages.value[existingIndex] = incoming;
+    // Tránh duplicate
+    const dupIdx = messages.value.findIndex(m =>
+      m.content === incoming.content &&
+      m.messageType === incoming.messageType &&
+      Math.abs(new Date(m.sentAt).getTime() - new Date(incoming.sentAt).getTime()) < 5000
+    );
+    if (dupIdx !== -1) {
+      messages.value[dupIdx] = incoming;
+      scrollToBottomForce();
+      return;
     }
-    sortAndScroll();  // Sort và scroll sau khi thêm tin mới
+
+    messages.value.push(incoming);
+    scrollToBottomForce();
   });
 };
 
-const retrySend = async (message: MessageResponseDTO) => {
-  if (sending.value) return;
-  sending.value = true;
-
-  message.isError = false;
-  message.isPending = true;
-
-  const payload: MessageRequestDTO = {
-    chatId: message.chatId,
-    content: message.content,
-    messageType: message.messageType,
-    parentMessageId: message.parentMessageId ?? null,
-  };
-
-  try {
-    await MessageService.sendMessage(payload, selectedFiles.value);
-    message.isPending = false;
-    clearPreview();
-  } catch (e: any) {
-    message.isPending = false;
-    message.isError = true;
-    alert(`Retry thất bại: ${e.message || "Lỗi không xác định"}`);
-  } finally {
-    sending.value = false;
+// Các hàm phụ trợ
+// const setMessageRef = (el: HTMLElement | null, id: number) => { if (el) messageRefs.value[id] = el; };
+const setMessageRef = (
+  el: Element | ComponentPublicInstance | null,
+  id: number
+) => {
+  if (el instanceof HTMLElement) {
+    messageRefs.value[id] = el;
   }
 };
-
-const onFileSelect = (e: Event) => {
-  const input = e.target as HTMLInputElement;
-  const files = Array.from(input.files || []);
-  selectedFiles.value = [];
-  previewUrls.value = [];
-
-  for (const file of files) {
-    if (file.size > 10 * 1024 * 1024) {
-      alert(`File "${file.name}" quá lớn! Giới hạn 10MB.`);
-      continue;
-    }
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      alert(`File "${file.name}" không hỗ trợ!`);
-      continue;
-    }
-    selectedFiles.value.push(file);
-    previewUrls.value.push(URL.createObjectURL(file));
-  }
-  input.value = "";
-};
-
-const fileInputRefClick = () => fileInputRef.value?.click();
-const removeFile = (index: number) => {
-  selectedFiles.value.splice(index, 1);
-  previewUrls.value.splice(index, 1);
-};
-const clearPreview = () => {
-  previewUrls.value.forEach(URL.revokeObjectURL);
-  selectedFiles.value = [];
-  previewUrls.value = [];
-};
-
-const setReplyMessage = (msg: MessageResponseDTO) => (replyingToMessage.value = msg);
-const cancelReply = () => (replyingToMessage.value = null);
-
-const getReplyPreview = (msg: MessageResponseDTO) => {
-  if (msg.messageType === "IMAGE") return "Ảnh";
-  if (msg.messageType === "VIDEO") return "Video";
-  return msg.content || "Tin nhắn trống";
-};
-
-const getParentContent = (parentId: number) => {
-  const parent = messages.value.find(m => m.id === parentId);
-  if (!parent) return `Tin nhắn #${parentId}`;
-  if (parent.messageType === "IMAGE") return "Ảnh";
-  if (parent.messageType === "VIDEO") return "Video";
-  return parent.content || "Tin nhắn trống";
-};
-
-const scrollToBottom = () => {
-  if (chatContentRef.value) {
-    chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
-  }
-};
-
 const scrollToParent = (id: number) => {
-  const target = messageRefs.value[id];
-  if (target) {
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  const el = messageRefs.value[id];
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
     highlightedMessageId.value = id;
-    setTimeout(() => (highlightedMessageId.value = null), 2000);
+    setTimeout(() => highlightedMessageId.value = null, 2000);
   }
 };
-
-const toggleEmojiPicker = (id: number) =>
-  (activeEmojiMessageId.value = activeEmojiMessageId.value === id ? null : id);
-
+const toggleEmojiPicker = (id: number) => activeEmojiMessageId.value = activeEmojiMessageId.value === id ? null : id;
 const addReaction = (emoji: any, msg: MessageResponseDTO) => {
-  const react = emoji.i;
-  msg.reactions = msg.reactions ? msg.reactions + "," + react : react;
+  const e = emoji.i || emoji.native || emoji;
+  msg.reactions = msg.reactions ? [...msg.reactions, e] : [e];
   activeEmojiMessageId.value = null;
-  // TODO: Gửi reaction lên server
 };
-
+const renderEmoji = (text: string) => {
+  if (!text) return "";
+  return text
+    .replace(/\n/g, "<br>")
+    .replace(/:\)/g, "😊")
+    .replace(/:D/g, "😄")
+    .replace(/<3/g, "❤️")
+    .replace(/:\(/g, "😢")
+    .replace(/:P/g, "😛")
+    .replace(/;\)/g, "😉");
+};
 const formatTime = (t: string | Date) => {
-  const date = new Date(t);
+  const d = new Date(t);
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  if (diff < 60 * 60 * 1000) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (now.getTime() - d.getTime() < 24*60*60*1000) {
+    return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString("vi-VN");
 };
-
+const getReplyPreview = (msg: MessageResponseDTO) => msg.messageType === "IMAGE" ? "Ảnh" : msg.messageType === "VIDEO" ? "Video" : msg.content || "Tin nhắn";
+const getParentContent = (id: number) => {
+  const m = messages.value.find(x => x.id === id);
+  return m ? (m.messageType === "IMAGE" ? "Ảnh" : m.messageType === "VIDEO" ? "Video" : m.content || "Tin nhắn") : "Tin nhắn đã xóa";
+};
+const fileInputRefClick = () => fileInputRef.value?.click();
+const onFileSelect = (e: Event) => {
+  const files = Array.from((e.target as HTMLInputElement).files || []);
+  selectedFiles.value = [];
+  previewUrls.value = [];
+  files.forEach(file => {
+    if (file.size > 10*1024*1024) alert(`File ${file.name} quá lớn!`);
+    else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      selectedFiles.value.push(file);
+      previewUrls.value.push(URL.createObjectURL(file));
+    }
+  });
+  (e.target as HTMLInputElement).value = "";
+};
+const removeFile = (i: number) => { selectedFiles.value.splice(i,1); previewUrls.value.splice(i,1); };
+const clearPreview = () => { previewUrls.value.forEach(URL.revokeObjectURL); selectedFiles.value = []; previewUrls.value = []; };
+const setReplyMessage = (msg: MessageResponseDTO) => replyingToMessage.value = msg;
+const cancelReply = () => replyingToMessage.value = null;
 const openImageModal = (url: string) => window.open(url, "_blank");
-
-const onImageError = (e: Event) => {
-  (e.target as HTMLImageElement).src = "/default-avatar.png";
-};
+const onImageError = (e: Event) => (e.target as HTMLImageElement).src = "/default-avatar.png";
 
 onUnmounted(() => {
-  if (currentSubId.value) {
-    unsubscribe(currentSubId.value);
-    currentSubId.value = null;
-  }
+  if (currentSubId.value) unsubscribe(currentSubId.value);
   clearPreview();
 });
+
+// Panel media
+const filteredMedia = computed(() => {
+  if (activeTab.value === "Media") return mediaList.value.filter(m => m.mediaType === "IMAGE" || m.mediaType === "VIDEO");
+  if (activeTab.value === "Docs") return mediaList.value.filter(m => m.mediaType === "FILE");
+  return [];
+});
+const displayMedia = computed(() => showAll.value ? filteredMedia.value : filteredMedia.value.slice(0, maxPreview));
 </script>
 
 <style scoped>
-.group:hover button {
-  opacity: 1;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.group:hover button { opacity: 1; }
 </style>
