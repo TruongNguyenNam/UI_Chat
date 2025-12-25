@@ -10,6 +10,9 @@ export interface ChatResponseDTO{
     gender: string;
 
     avatarUrl:string;
+    isOnline: boolean;
+
+    lastActive: string;
 }
 
 

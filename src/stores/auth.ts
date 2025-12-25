@@ -55,11 +55,26 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // 🚪 LOGOUT
-    logout() {
-      sessionStorage.clear();
-      this.userInfo = null;
-      this.isLoggedIn = false;
-      disconnect();
+    async logout() {
+      try {
+        // 1️⃣ Gọi backend logout (cập nhật isOnline = false)
+        await AuthService.logout();
+      } catch (error) {
+        console.warn("Backend logout failed", error);
+      } finally {
+        // 2️⃣ Disconnect WebSocket
+        disconnect();
+    
+        // 3️⃣ Clear session
+        sessionStorage.clear();
+    
+        // 4️⃣ Reset store
+        this.userInfo = null;
+        this.isLoggedIn = false;
+      }
     },
+
+
+
   },
 });

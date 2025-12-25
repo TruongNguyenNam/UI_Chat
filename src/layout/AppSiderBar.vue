@@ -59,7 +59,10 @@
             <li class="hover:bg-gray-100 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2">
               <i class="pi pi-question-circle"></i> Trợ giúp
             </li>
-            <li class="hover:bg-gray-100 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-red-600">
+            <li
+              class="hover:bg-gray-100 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-red-600"
+              @click="logout"
+            >
               <i class="pi pi-sign-out"></i> Đăng xuất
             </li>
           </ul>
@@ -72,8 +75,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'  // Đảm bảo đường dẫn đúng với store auth của bạn
 
 const router = useRouter()
+const authStore = useAuthStore()
 const showMenu = ref(false)
 
 const toggleMenu = () => {
@@ -93,12 +98,17 @@ const goToSettings = () => {
   showMenu.value = false
 }
 
+const logout = async () => {
+  showMenu.value = false
+  await authStore.logout()  // Gọi hàm logout từ store để clear session, disconnect WS, v.v.
+  router.push('/auth')      // Chuyển hướng về trang login
+}
+
 const navItems = [
   { name: "messages", to: "/chat", icon: "pi pi-comments" },
   { name: "contacts", to: "/contacts", icon: "pi pi-user" },
   { name: "notifications", to: "/notifications", icon: "pi pi-bell" },
   { name: "calls", to: "/call", icon: "pi pi-phone" },
-  { name: "darkmode", to: "/dark", icon: "pi pi-moon" },
   { name: "settings", to: "/settings", icon: "pi pi-cog" },
 ]
 </script>

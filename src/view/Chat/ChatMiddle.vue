@@ -12,8 +12,30 @@
             @error="onImageError"
           />
           <div class="flex-1">
-            <p class="font-semibold text-lg text-gray-900">{{ selectedFriend.fullName }}</p>
-            <p class="text-sm text-green-600">Đang hoạt động</p>
+              <p class="font-semibold text-lg text-gray-900">{{ selectedFriend?.fullName }}</p>
+              
+              <p class="text-sm flex items-center gap-2 mt-1" :class="statusColor">
+                <!-- Chấm tròn trạng thái -->
+                <span class="relative flex h-3 w-3">
+                  <!-- Hiệu ứng nhấp nháy khi online -->
+                  <span
+                    :class="[
+                      'absolute inline-flex h-full w-full rounded-full opacity-75',
+                      isOnline ? 'animate-ping bg-green-400' : ''
+                    ]"
+                  ></span>
+                  <!-- Chấm chính -->
+                  <span
+                    :class="[
+                      'relative inline-flex rounded-full h-3 w-3',
+                      isOnline ? 'bg-green-500' : 'bg-gray-500'
+                    ]"
+                  ></span>
+                </span>
+
+                <!-- Văn bản trạng thái -->
+                <span>{{ statusText }}</span>
+              </p>
           </div>
           <div class="flex gap-3">
             <Button icon="pi pi-phone" rounded text severity="secondary" size="large" />
@@ -225,67 +247,12 @@
     </div>
 
     <!-- Panel bên phải -->
-    <div v-if="panelOpen && selectedFriend" class="w-80 bg-white border-l border-gray-200 flex flex-col h-full shadow-xl">
-      <div class="p-6 text-center border-b">
-        <img
-          :src="selectedFriend.avatarUrl || '/default-avatar.png'"
-          class="w-28 h-28 rounded-full mx-auto object-cover ring-4 ring-blue-100 shadow-lg"
-          @error="onImageError"
-        />
-        <p class="mt-4 font-bold text-xl">{{ selectedFriend.fullName }}</p>
-        <p class="text-sm text-gray-500">@{{ selectedFriend.fullName.toLowerCase().replace(/\s/g, '') }}</p>
-
-        <div class="flex justify-center gap-6 mt-6 text-gray-600">
-          <i class="pi pi-phone text-2xl cursor-pointer hover:text-blue-600 transition"></i>
-          <i class="pi pi-video text-2xl cursor-pointer hover:text-blue-600 transition"></i>
-          <i class="pi pi-bell text-2xl cursor-pointer hover:text-gray-800 transition"></i>
-          <i class="pi pi-search text-2xl cursor-pointer hover:text-gray-800 transition"></i>
-        </div>
-      </div>
-
-      <div class="p-4 border-b">
-        <h3 class="font-semibold text-lg mb-3">Tệp đính kèm</h3>
-        <div class="flex gap-2">
-          <button
-            v-for="tab in tabs"
-            :key="tab"
-            @click="activeTab = tab"
-            class="px-4 py-2 rounded-lg text-sm font-medium transition"
-            :class="activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'"
-          >
-            {{ tab }}
-          </button>
-        </div>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-4">
-        <div v-if="filteredMedia.length === 0" class="text-center text-gray-400 py-12">
-          Chưa có tệp nào
-        </div>
-
-        <div v-else class="grid grid-cols-3 gap-3">
-          <div v-for="media in displayMedia" :key="media.id" class="relative overflow-hidden rounded-lg cursor-pointer group" @click="openImageModal(media.mediaUrl)">
-            <img v-if="media.mediaType === 'IMAGE'" :src="media.mediaUrl" class="w-full h-28 object-cover transition group-hover:scale-110" />
-            <video v-else-if="media.mediaType === 'VIDEO'" :src="media.mediaUrl" class="w-full h-28 object-cover transition group-hover:scale-110" muted playsinline />
-            <div v-else class="w-full h-28 bg-gray-100 flex items-center justify-center">
-              <i class="pi pi-file text-4xl text-gray-400"></i>
-            </div>
-            <div v-if="media.mediaType === 'VIDEO'" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/30">
-              <i class="pi pi-play-circle text-4xl text-white"></i>
-            </div>
-          </div>
-
-          <div v-if="filteredMedia.length > maxPreview && !showAll" class="h-28 bg-gray-200/80 rounded-lg flex items-center justify-center text-2xl font-bold text-gray-600">
-            +{{ filteredMedia.length - maxPreview }}
-          </div>
-        </div>
-
-        <button v-if="filteredMedia.length > maxPreview" @click="showAll = !showAll" class="mt-6 w-full py-3 border rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2">
-          {{ showAll ? 'Thu gọn' : 'Xem thêm' }}
-          <i :class="showAll ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"></i>
-        </button>
-      </div>
-    </div>
+    <ChatMediaPanel
+      v-if="panelOpen && selectedFriend"
+      :mediaList="mediaList"
+      :fullName="selectedFriend.fullName"
+      :avatarUrl="selectedFriend.avatarUrl"
+    />
 
     <!-- Hidden file input -->
     <input type="file" accept="image/*,video/*" multiple @change="onFileSelect" class="hidden" ref="fileInputRef" />
@@ -293,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted, nextTick, computed } from "vue";
+import { ref, watch, onUnmounted, nextTick,computed } from "vue";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import EmojiPicker from "vue3-emoji-picker";
@@ -309,10 +276,58 @@ import { MessageService } from "../../service/MessageService";
 import { MediaService } from "../../service/MediaService";
 import { subscribe, unsubscribe } from "../../service/WebSocketService";
 import { useAuthStore } from "../../stores/auth";
+import ChatMediaPanel from "./ChatMediaPanel.vue";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import updateLocale from "dayjs/plugin/updateLocale";
 
+dayjs.extend(relativeTime);
+dayjs.extend(updateLocale);
 const props = defineProps({
   selectedFriend: Object as PropType<ChatResponseDTO | null>,
 });
+
+// Tùy chỉnh tiếng Việt cho "X phút trước"
+dayjs.updateLocale("en", {
+  relativeTime: {
+    future: "trong %s",
+    past: "%s trước",
+    s: "vài giây",
+    ss: "%d giây",
+    m: "1 phút",
+    mm: "%d phút",
+    h: "1 giờ",
+    hh: "%d giờ",
+    d: "1 ngày",
+    dd: "%d ngày",
+    M: "1 tháng",
+    MM: "%d tháng",
+    y: "1 năm",
+    yy: "%d năm",
+  },
+});
+
+// Computed: có đang online không? (dưới 5 phút kể từ lastActive)
+const isOnline = computed(() => {
+  if (!props.selectedFriend?.lastActive) return false;
+  const last = dayjs(props.selectedFriend.lastActive);
+  return dayjs().diff(last, "minute") < 5;
+});
+
+// Văn bản hiển thị
+const statusText = computed(() => {
+  if (!props.selectedFriend?.lastActive) return "Offline";
+
+  return isOnline.value 
+    ? "Đang hoạt động" 
+    : dayjs(props.selectedFriend.lastActive).fromNow(); // "5 phút trước", "2 giờ trước",...
+});
+
+// Màu sắc
+const statusColor = computed(() => {
+  return isOnline.value ? "text-green-600" : "text-gray-500";
+});
+
 
 const authStore = useAuthStore();
 const currentUserId = authStore.userId || 0;
@@ -328,25 +343,14 @@ const previewUrls = ref<string[]>([]);
 const replyingToMessage = ref<MessageResponseDTO | null>(null);
 const activeEmojiMessageId = ref<number | null>(null);
 const highlightedMessageId = ref<number | null>(null);
-
-// Refs
 const chatContentRef = ref<HTMLElement | null>(null);
 const messageInputRef = ref<any>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const messageRefs = ref<Record<number, HTMLElement>>({});
 const currentSubId = ref<string | null>(null);
-
-// Panel
 const panelOpen = ref(false);
-const tabs = ["Media", "Link", "Docs"] as const;
-const activeTab = ref<"Media" | "Link" | "Docs">("Media");
-const showAll = ref(false);
-const maxPreview = 9;
-
-// Emoji picker dưới input
 const emojiPickerOpen = ref(false);
 
-// Scroll
 const scrollToBottomForce = () => {
   nextTick(() => {
     if (!chatContentRef.value) return;
@@ -578,12 +582,12 @@ onUnmounted(() => {
 });
 
 // Panel media
-const filteredMedia = computed(() => {
-  if (activeTab.value === "Media") return mediaList.value.filter(m => m.mediaType === "IMAGE" || m.mediaType === "VIDEO");
-  if (activeTab.value === "Docs") return mediaList.value.filter(m => m.mediaType === "FILE");
-  return [];
-});
-const displayMedia = computed(() => showAll.value ? filteredMedia.value : filteredMedia.value.slice(0, maxPreview));
+// const filteredMedia = computed(() => {
+//   if (activeTab.value === "Media") return mediaList.value.filter(m => m.mediaType === "IMAGE" || m.mediaType === "VIDEO");
+//   if (activeTab.value === "Docs") return mediaList.value.filter(m => m.mediaType === "FILE");
+//   return [];
+// });
+// const displayMedia = computed(() => showAll.value ? filteredMedia.value : filteredMedia.value.slice(0, maxPreview));
 </script>
 
 <style scoped>

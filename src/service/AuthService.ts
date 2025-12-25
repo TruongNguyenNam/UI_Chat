@@ -77,6 +77,11 @@ export const AuthService = {
     return response.data;
   },
 
+  logout: async (): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post<ApiResponse<null>>('/logout');
+    return response.data;
+  }
+
 };
 
 export interface LoginInfoDto {

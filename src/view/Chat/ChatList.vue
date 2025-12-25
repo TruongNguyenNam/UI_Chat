@@ -15,7 +15,7 @@
           </IconField>
         </div>
 
-        <Button icon="pi pi-user-plus" class="ml-2 text-xs px-2 py-1"
+        <Button icon="pi pi-user-plus" class="ml-2 text-xs px-2 py-1" severity="info"
         @click="showAddFriendDialog = true"
         />
       </div>
@@ -29,31 +29,44 @@
       </div>
 
       <ScrollPanel style="width: 100%; height: calc(100vh - 120px);">
-        <ul class="space-y-2">
-          <li
-            v-for="friend in listChats"
-            :key="friend.chatId"
-            class="flex items-center gap-3 p-2 rounded hover:bg-gray-100 cursor-pointer"
-            @click="selectFriend(friend)"
-          >
-            <!-- Avatar + trạng thái -->
-            <div class="relative">
-              <img :src="friend.avatarUrl" class="w-12 h-12 rounded-full border" />
-              <!-- <span
-                v-if="friend.userStatus === 'online'"
-                class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border border-white rounded-full"
-              ></span> -->
-            </div>
+  <ul class="space-y-2">
+    <li
+      v-for="friend in listChats"
+      :key="friend.chatId"
+      class="flex items-center gap-3 p-2 rounded hover:bg-gray-100 cursor-pointer"
+      @click="selectFriend(friend)"
+    >
+      <!-- Avatar + trạng thái -->
+      <div class="relative inline-block">
+        <img
+          :src="friend.avatarUrl"
+          class="w-12 h-12 rounded-full border object-cover"
+        />
 
-            <!-- Thông tin -->
-            <div class="flex flex-col">
-              <p class="font-semibold">{{ friend.fullName }}</p>
-              <!-- <p v-if="friend.userStatus === 'online'" class="text-sm text-green-500">Online</p>
-              <p v-else class="text-sm text-gray-500">{{ friend.userStatus }}</p> -->
-            </div>
-          </li>
-        </ul>
-      </ScrollPanel>
+        <!-- 🟢 ONLINE -->
+        <span
+          v-if="friend.isOnline"
+          class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"
+        ></span>
+
+        <!-- ⏱ OFFLINE - Thời gian hoạt động cuối -->
+        <div
+          v-else
+          class="absolute left-1/2 -translate-x-1/2 bottom-[-20px] w-full text-center"
+        >
+          <span class="text-xs text-gray-500 whitespace-nowrap">
+            {{ formatLastActive(friend.lastActive) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Thông tin -->
+      <div class="flex flex-col">
+        <p class="font-semibold">{{ friend.fullName }}</p>
+      </div>
+    </li>
+  </ul>
+</ScrollPanel>
     </div>
     <!-- Khu vực chat -->
     <ChatMiddle :selectedFriend="selectedFriend" />
@@ -116,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted,watch } from "vue";
 import IconField from "primevue/iconfield";
 import InputIcon from "primevue/inputicon";
 import InputText from "primevue/inputtext";
@@ -130,6 +143,8 @@ import type { ChatResponseDTO } from "../../model/chat/ChatResponseDTO";
 import { useAuthStore } from "../../stores/auth";
 import Dialog from "primevue/dialog";
 import ProgressSpinner from "primevue/progressspinner";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 
 const authStore = useAuthStore();
 const loading = ref(false);
@@ -140,6 +155,13 @@ const phoneSearch = ref("");
 const searchResult = ref<FriendResponseDTO | null>(null);
 const searching = ref(false);
 
+dayjs.extend(relativeTime)
+
+const formatLastActive = (lastActive?: string | Date) => {
+  if (!lastActive) return ""
+
+  return dayjs(lastActive).fromNow() // vd: "5 phút trước"
+}
 
 const searchByPhone = async () => {
   if (!phoneSearch.value) return;
@@ -159,14 +181,16 @@ const searchByPhone = async () => {
 };
 
 
+
+
 const fetchChatlist = async () => {
   try {
     loading.value = true;
     const response = await ChatService.findAllByChatType();
     listChats.value = response.data || [];
-    console.log("listContacts", listChats.value);
+    console.log("danh sách đoạn chat: ", listChats.value);
   } catch (error) {
-    console.error("Failed to fetch contacts:", error);
+    console.error("không thể lấy danh sách đoạn chat:", error);
   } finally {
     loading.value = false;
   }
@@ -179,6 +203,23 @@ const selectFriend = (friend: ChatResponseDTO) => {
 onMounted(() => {
   console.log(authStore.userInfo?.userId)
   // fetchContacts();
-  fetchChatlist();
+  // fetchChatlist();
 });
+
+
+watch(
+  () => authStore.userInfo,
+  (newUserInfo) => {
+    if (newUserInfo) {
+      fetchChatlist();
+    } else {
+      // Vừa logout
+      listChats.value = [];
+      selectedFriend.value = null;
+    }
+  },
+  { immediate: true } 
+);
+
+
 </script>
