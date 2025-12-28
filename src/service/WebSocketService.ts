@@ -76,3 +76,5 @@ export const disconnect = () => {
   client = null;
   console.log("🔌 WebSocket DISCONNECTED");
 };
+
+export const getWebSocketClient = (): Client | null => client;

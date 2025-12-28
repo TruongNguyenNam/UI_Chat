@@ -1,7 +1,7 @@
 <template>
   <div class="h-full flex">
     <!-- Phần chat chính -->
-    <div :class="['flex flex-col bg-gray-50 transition-all duration-300', panelOpen ? 'w-full lg:w-[calc(100%-320px)]' : 'w-full']">
+    <div class="w-197 bg-white border-r border-gray-200 flex flex-col shrink-0">
       <div v-if="selectedFriend" class="flex flex-col h-full">
         <!-- Header -->
         <div class="bg-white border-b border-gray-200 px-5 py-4 flex items-center gap-4 shadow-sm">
@@ -12,30 +12,24 @@
             @error="onImageError"
           />
           <div class="flex-1">
-              <p class="font-semibold text-lg text-gray-900">{{ selectedFriend?.fullName }}</p>
-              
-              <p class="text-sm flex items-center gap-2 mt-1" :class="statusColor">
-                <!-- Chấm tròn trạng thái -->
-                <span class="relative flex h-3 w-3">
-                  <!-- Hiệu ứng nhấp nháy khi online -->
-                  <span
-                    :class="[
-                      'absolute inline-flex h-full w-full rounded-full opacity-75',
-                      isOnline ? 'animate-ping bg-green-400' : ''
-                    ]"
-                  ></span>
-                  <!-- Chấm chính -->
-                  <span
-                    :class="[
-                      'relative inline-flex rounded-full h-3 w-3',
-                      isOnline ? 'bg-green-500' : 'bg-gray-500'
-                    ]"
-                  ></span>
-                </span>
-
-                <!-- Văn bản trạng thái -->
-                <span>{{ statusText }}</span>
-              </p>
+            <p class="font-semibold text-lg text-gray-900">{{ selectedFriend?.fullName }}</p>
+            <p class="text-sm flex items-center gap-2 mt-1" :class="statusColor">
+              <span class="relative flex h-3 w-3">
+                <span
+                  :class="[
+                    'absolute inline-flex h-full w-full rounded-full opacity-75',
+                    isOnline ? 'animate-ping bg-green-400' : ''
+                  ]"
+                ></span>
+                <span
+                  :class="[
+                    'relative inline-flex rounded-full h-3 w-3',
+                    isOnline ? 'bg-green-500' : 'bg-gray-500'
+                  ]"
+                ></span>
+              </span>
+              <span>{{ statusText }}</span>
+            </p>
           </div>
           <div class="flex gap-3">
             <Button icon="pi pi-phone" rounded text severity="secondary" size="large" />
@@ -160,7 +154,6 @@
 
         <!-- Input area -->
         <div class="bg-white border-t border-gray-200 p-5">
-          <!-- Preview file -->
           <div v-if="selectedFiles.length > 0" class="mb-4 flex flex-wrap gap-4">
             <div v-for="(file, idx) in selectedFiles" :key="idx" class="relative group">
               <img
@@ -182,7 +175,6 @@
           </div>
 
           <div class="flex items-end gap-3">
-            <!-- Nút Emoji (mở picker dưới input) -->
             <Button
               icon="pi pi-face-smile"
               rounded
@@ -192,8 +184,6 @@
               @click="emojiPickerOpen = !emojiPickerOpen"
               :class="emojiPickerOpen ? 'bg-blue-100 text-blue-600' : ''"
             />
-
-            <!-- Nút Attach File -->
             <Button
               icon="pi pi-paperclip"
               rounded
@@ -203,8 +193,6 @@
               @click="fileInputRefClick"
               :disabled="sending"
             />
-
-            <!-- Input Text -->
             <InputText
               ref="messageInputRef"
               v-model="newMessage"
@@ -215,8 +203,6 @@
               @keyup.enter.shift.exact="newMessage += '\n'"
               :disabled="sending"
             />
-
-            <!-- Send Button -->
             <Button
               icon="pi pi-send"
               rounded
@@ -228,7 +214,6 @@
             />
           </div>
 
-          <!-- Emoji Picker dưới input -->
           <transition name="fade">
             <div v-if="emojiPickerOpen" class="mt-4">
               <EmojiPicker @select="addEmojiToInput" theme="light" :native="true" style="width: 100%;" />
@@ -260,11 +245,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted, nextTick,computed } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from "vue";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import EmojiPicker from "vue3-emoji-picker";
 import "vue3-emoji-picker/css";
+import { useToast } from "primevue/usetoast";
 import type { ComponentPublicInstance } from 'vue';
 import type { PropType } from "vue";
 import type { MessageResponseDTO } from "../../model/message/MessageResponseDTO";
@@ -274,7 +260,7 @@ import type { ChatResponseDTO } from "../../model/chat/ChatResponseDTO";
 import { MessageContentType } from "../../model/message/MessageContentType";
 import { MessageService } from "../../service/MessageService";
 import { MediaService } from "../../service/MediaService";
-import { subscribe, unsubscribe } from "../../service/WebSocketService";
+import { subscribe, unsubscribe, getWebSocketClient } from "../../service/WebSocketService"; // lấy client trực tiếp
 import { useAuthStore } from "../../stores/auth";
 import ChatMediaPanel from "./ChatMediaPanel.vue";
 import dayjs from "dayjs";
@@ -283,11 +269,11 @@ import updateLocale from "dayjs/plugin/updateLocale";
 
 dayjs.extend(relativeTime);
 dayjs.extend(updateLocale);
+
 const props = defineProps({
   selectedFriend: Object as PropType<ChatResponseDTO | null>,
 });
 
-// Tùy chỉnh tiếng Việt cho "X phút trước"
 dayjs.updateLocale("en", {
   relativeTime: {
     future: "trong %s",
@@ -307,30 +293,28 @@ dayjs.updateLocale("en", {
   },
 });
 
-// Computed: có đang online không? (dưới 5 phút kể từ lastActive)
 const isOnline = computed(() => {
   if (!props.selectedFriend?.lastActive) return false;
   const last = dayjs(props.selectedFriend.lastActive);
   return dayjs().diff(last, "minute") < 5;
 });
 
-// Văn bản hiển thị
 const statusText = computed(() => {
   if (!props.selectedFriend?.lastActive) return "Offline";
-
-  return isOnline.value 
-    ? "Đang hoạt động" 
-    : dayjs(props.selectedFriend.lastActive).fromNow(); // "5 phút trước", "2 giờ trước",...
+  return isOnline.value ? "Đang hoạt động" : dayjs(props.selectedFriend.lastActive).fromNow();
 });
 
-// Màu sắc
 const statusColor = computed(() => {
   return isOnline.value ? "text-green-600" : "text-gray-500";
 });
 
-
 const authStore = useAuthStore();
 const currentUserId = authStore.userId || 0;
+
+const client = getWebSocketClient();
+
+// Toast
+const toast = useToast();
 
 // State
 const messages = ref<MessageResponseDTO[]>([]);
@@ -351,11 +335,73 @@ const currentSubId = ref<string | null>(null);
 const panelOpen = ref(false);
 const emojiPickerOpen = ref(false);
 
+// Theo dõi chat hiện tại để tránh notification thừa
+const currentChatId = ref<number | null>(null);
+
+// ID subscription notification cá nhân
+let notificationSubId = "";
+
+// Hàm gửi enter / leave
+const enterChat = (chatId: number) => {
+  
+  if (client?.connected) {
+    client.publish({
+      destination: "/app/chat.enter",
+      body: JSON.stringify({ chatId }),
+    });
+  }
+};
+
+const leaveChat = (chatId: number) => {
+  if (client?.connected) {
+    client.publish({
+      destination: "/app/chat.leave",
+      body: JSON.stringify({ chatId }),
+    });
+  }
+};
+
+// let notificationSubId = ""; // string như currentSubId
+
+const subscribeToPersonalNotifications = () => {
+  if (!client?.connected || notificationSubId) return;
+
+  // BẮT BUỘC dùng /user/queue cho notification cá nhân
+  const destination = "/user/queue/notifications";
+
+  const sub = client.subscribe(destination, (stompMsg) => {
+    try {
+      const notif = JSON.parse(stompMsg.body);
+      // phát âm thanh (không crash nếu fail)
+      new Audio("/notification.mp3").play().catch(() => {});
+
+      if (
+        notif.type === "MESSAGE" &&
+        currentChatId.value !== notif.relatedId
+      ) {
+        toast.add({
+          severity: "info",
+          summary: "Tin nhắn mới",
+          detail: notif.content,
+          life: 8000,
+        });
+      }
+    } catch (err) {
+      console.error("❌ Parse notification failed:", err);
+    }
+  });
+
+  notificationSubId = sub.id;
+  console.log("✅ Subscribed personal notifications:", destination);
+};
+
+
+// Scroll
 const scrollToBottomForce = () => {
   nextTick(() => {
     if (!chatContentRef.value) return;
     chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
-    [100, 300, 600, 1000].forEach(d => setTimeout(() => {
+    [100, 300, 600].forEach(d => setTimeout(() => {
       if (chatContentRef.value) chatContentRef.value.scrollTop = chatContentRef.value.scrollHeight;
     }, d));
   });
@@ -364,38 +410,56 @@ const scrollToBottomForce = () => {
 const onMediaLoad = () => scrollToBottomForce();
 watch(messages, () => scrollToBottomForce(), { deep: true });
 
-// Load chat
-watch(() => props.selectedFriend, async (friend) => {
-  messages.value = [];
-  mediaList.value = [];
-  panelOpen.value = false;
-  emojiPickerOpen.value = false;
+// Watch selectedFriend – xử lý enter/leave + load chat
+watch(
+  () => props.selectedFriend,
+  async (friend, oldFriend) => {
+    // Rời chat cũ nếu có
+    if (oldFriend?.chatId && oldFriend.chatId !== friend?.chatId) {
+      leaveChat(oldFriend.chatId);
+    }
 
-  if (currentSubId.value) unsubscribe(currentSubId.value);
+    // Reset
+    messages.value = [];
+    mediaList.value = [];
+    panelOpen.value = false;
+    emojiPickerOpen.value = false;
 
-  if (!friend?.chatId) return;
+    if (currentSubId.value) unsubscribe(currentSubId.value);
 
-  const chatId = friend.chatId;
-  loading.value = true;
+    if (!friend?.chatId) {
+      currentChatId.value = null;
+      return;
+    }
 
-  try {
-    const [msgRes, mediaRes] = await Promise.all([
-      MessageService.getChatMessages(chatId),
-      MediaService.getAllMediaByChatId(chatId)
-    ]);
+    const chatId = friend.chatId;
+    currentChatId.value = chatId;
 
-    if (props.selectedFriend?.chatId !== chatId) return;
+    // Báo server đang vào chat
+    enterChat(chatId);
 
-    messages.value = msgRes.data || [];
-    mediaList.value = mediaRes.data ?? [];
-    scrollToBottomForce();
-    subscribeToChat(chatId);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    if (props.selectedFriend?.chatId === chatId) loading.value = false;
-  }
-}, { immediate: true });
+    loading.value = true;
+
+    try {
+      const [msgRes, mediaRes] = await Promise.all([
+        MessageService.getChatMessages(chatId),
+        MediaService.getAllMediaByChatId(chatId),
+      ]);
+
+      if (props.selectedFriend?.chatId !== chatId) return;
+
+      messages.value = msgRes.data || [];
+      mediaList.value = mediaRes.data ?? [];
+      scrollToBottomForce();
+      subscribeToChat(chatId);
+    } catch (err) {
+      console.error("Load chat failed:", err);
+    } finally {
+      if (props.selectedFriend?.chatId === chatId) loading.value = false;
+    }
+  },
+  { immediate: true }
+);
 
 // Gửi tin nhắn
 const sendMessage = async () => {
@@ -450,7 +514,6 @@ const sendMessage = async () => {
   }
 };
 
-// Thêm emoji vào ô nhập
 const addEmojiToInput = (emoji: any) => {
   const native = emoji.i || emoji.native || emoji;
   newMessage.value += native;
@@ -458,7 +521,7 @@ const addEmojiToInput = (emoji: any) => {
   nextTick(() => messageInputRef.value?.$el.querySelector('input')?.focus());
 };
 
-// WebSocket
+// WebSocket chat topic
 const normalizeIncomingMessage = (msg: any): MessageResponseDTO => ({
   id: msg.id,
   chatId: msg.chatId,
@@ -480,7 +543,6 @@ const subscribeToChat = (chatId: number) => {
   currentSubId.value = subscribe(topic, (stompMsg) => {
     const incoming = normalizeIncomingMessage(JSON.parse(stompMsg.body));
 
-    // Thay thế optimistic message
     if (incoming.senderId === currentUserId) {
       const idx = messages.value.findIndex(m => m.id < 0 || m.isPending);
       if (idx !== -1) {
@@ -490,7 +552,6 @@ const subscribeToChat = (chatId: number) => {
       }
     }
 
-    // Tránh duplicate
     const dupIdx = messages.value.findIndex(m =>
       m.content === incoming.content &&
       m.messageType === incoming.messageType &&
@@ -507,12 +568,8 @@ const subscribeToChat = (chatId: number) => {
   });
 };
 
-// Các hàm phụ trợ
-// const setMessageRef = (el: HTMLElement | null, id: number) => { if (el) messageRefs.value[id] = el; };
-const setMessageRef = (
-  el: Element | ComponentPublicInstance | null,
-  id: number
-) => {
+// Các hàm phụ trợ (giữ nguyên)
+const setMessageRef = (el: Element | ComponentPublicInstance | null, id: number) => {
   if (el instanceof HTMLElement) {
     messageRefs.value[id] = el;
   }
@@ -545,7 +602,7 @@ const renderEmoji = (text: string) => {
 const formatTime = (t: string | Date) => {
   const d = new Date(t);
   const now = new Date();
-  if (now.getTime() - d.getTime() < 24*60*60*1000) {
+  if (now.getTime() - d.getTime() < 24 * 60 * 60 * 1000) {
     return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   }
   return d.toLocaleDateString("vi-VN");
@@ -561,7 +618,7 @@ const onFileSelect = (e: Event) => {
   selectedFiles.value = [];
   previewUrls.value = [];
   files.forEach(file => {
-    if (file.size > 10*1024*1024) alert(`File ${file.name} quá lớn!`);
+    if (file.size > 10 * 1024 * 1024) alert(`File ${file.name} quá lớn!`);
     else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
       selectedFiles.value.push(file);
       previewUrls.value.push(URL.createObjectURL(file));
@@ -569,25 +626,33 @@ const onFileSelect = (e: Event) => {
   });
   (e.target as HTMLInputElement).value = "";
 };
-const removeFile = (i: number) => { selectedFiles.value.splice(i,1); previewUrls.value.splice(i,1); };
+const removeFile = (i: number) => { selectedFiles.value.splice(i, 1); previewUrls.value.splice(i, 1); };
 const clearPreview = () => { previewUrls.value.forEach(URL.revokeObjectURL); selectedFiles.value = []; previewUrls.value = []; };
 const setReplyMessage = (msg: MessageResponseDTO) => replyingToMessage.value = msg;
 const cancelReply = () => replyingToMessage.value = null;
 const openImageModal = (url: string) => window.open(url, "_blank");
 const onImageError = (e: Event) => (e.target as HTMLImageElement).src = "/default-avatar.png";
 
-onUnmounted(() => {
+// Lifecycle
+onMounted(() => {
+  nextTick(() => {
+    subscribeToPersonalNotifications();
+  });
+});
+
+onBeforeUnmount(() => {
+  if (currentChatId.value) {
+    leaveChat(currentChatId.value);
+  }
+
+  if (notificationSubId) {
+    unsubscribe(notificationSubId);
+    notificationSubId = ""; // hoặc null
+  }
+
   if (currentSubId.value) unsubscribe(currentSubId.value);
   clearPreview();
 });
-
-// Panel media
-// const filteredMedia = computed(() => {
-//   if (activeTab.value === "Media") return mediaList.value.filter(m => m.mediaType === "IMAGE" || m.mediaType === "VIDEO");
-//   if (activeTab.value === "Docs") return mediaList.value.filter(m => m.mediaType === "FILE");
-//   return [];
-// });
-// const displayMedia = computed(() => showAll.value ? filteredMedia.value : filteredMedia.value.slice(0, maxPreview));
 </script>
 
 <style scoped>
