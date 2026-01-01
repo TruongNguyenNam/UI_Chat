@@ -62,6 +62,18 @@ export const MessageService = {
       return response.data;
     },
 
+    deleteMessage: async (messageId: number) :Promise<ApiResponse<void>> => {
+        try {
+            const response = await axiosInstance.delete(`${API_URL}/chat/${messageId}`);
+            return response.data;
+        } catch (error) {
+          console.error('thu hồi tin nhắn thất bại:', error);
+          throw new Error('Failed to delete message . Please try again later.');
+
+        }
+    }
+
+
 
     
 };

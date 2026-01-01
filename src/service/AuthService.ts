@@ -81,6 +81,20 @@ export const AuthService = {
     const response = await axiosInstance.post<ApiResponse<null>>('/logout');
     return response.data;
   }
+  ,
+  getAllUserIsOnline: async () : Promise<ApiResponse<UserOnlineDTO[]>> => {
+      try {
+        const response = await axiosInstance.get<ApiResponse<UserOnlineDTO[]>>('/online');
+        return response.data;
+      } catch (error) {
+        console.error('lỗi không thể lấy danh các người dùng online:', error);
+        throw new Error('Failed to fetch user is online. Please try again later.');
+    }
+    
+
+  }
+
+
 
 };
 
@@ -121,12 +135,6 @@ export interface LoginForm {
   password: string;
 }
 
-export interface ChangePasswordForm {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
 export interface RegisterForm {
   username: string;
   password: string;
@@ -137,3 +145,19 @@ export interface TokenDTO {
   token: string;
   refreshToken: string;
 }
+
+export interface UserMsg{
+  userId : number;
+  fullName: string;
+  isOnline: boolean;
+  lastActive: string;
+  lastLogin: string;
+}
+
+export interface UserOnlineDTO{
+  userId : number;
+  isOnline: boolean;
+  lastActive: string;
+}
+
+

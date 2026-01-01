@@ -2,15 +2,15 @@
   <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex items-center justify-center p-4">
     <div class="w-full max-w-md">
       <!-- Logo -->
-      <!-- <div class="text-center mb-8">
+      <div class="text-center mb-8">
         <img
-          :src="logoUrl"
+          src="../../assets/img/logo.png"
           alt="ChatApp Logo"
           class="mx-auto h-20 w-auto rounded-full shadow-xl border-4 border-white"
         />
         <h1 class="mt-4 text-3xl font-bold text-gray-900">ChatApp</h1>
         <p class="text-gray-600 mt-1">Kết nối mọi lúc, mọi nơi</p>
-      </div> -->
+      </div>
 
       <!-- Card -->
       <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import InputText from 'primevue/inputtext'
@@ -133,9 +133,9 @@ const rememberMe = ref(false)
 const isLoading = ref(false)
 const submitted = ref(false)
 
-const logoUrl = computed(() => {
-  return new URL('../assets/img/logo.png', import.meta.url).href
-})
+// const logoUrl = computed(() => {
+//   return new URL('../assets/img/logo.png', import.meta.url).href
+// })
 
 onMounted(() => {
   authStore.restoreSession()

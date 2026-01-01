@@ -2,18 +2,21 @@
 import { defineStore } from "pinia";
 import { AuthService } from "../service/AuthService";
 import { connectWebSocket, disconnect } from "../service/WebSocketService";
-import type { LoginForm, LoginInfoDto } from "@/service/AuthService";
+import type { LoginForm, LoginInfoDto,UserOnlineDTO } from "@/service/AuthService";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     userInfo: JSON.parse(sessionStorage.getItem("userInfo") || "null") as LoginInfoDto | null,
     isLoggedIn: !!sessionStorage.getItem("accessToken"),
+    onlineUsers: [] as UserOnlineDTO[],
   }),
 
   getters: {
     username: (state) => state.userInfo?.username,
     userId: (state) => state.userInfo?.userId,
     token: () => sessionStorage.getItem("accessToken"),
+    isUserOnline: (state) => (userId: number) =>
+    state.onlineUsers.some((u) => u.userId === userId),
   },
 
   actions: {
@@ -72,6 +75,37 @@ export const useAuthStore = defineStore("auth", {
         this.userInfo = null;
         this.isLoggedIn = false;
       }
+    },
+
+    async fetchOnlineUsers() {
+      try {
+        const res = await AuthService.getAllUserIsOnline();
+        this.onlineUsers = res.data ?? [];
+      } catch (e) {
+        console.error("❌ fetchOnlineUsers failed", e);
+      }
+    },
+    
+    setUserOnline(userId: number, lastActive: string) {
+      const user = this.onlineUsers.find(u => u.userId === userId);
+    
+      if (!user) {
+        this.onlineUsers.push({
+          userId,
+          isOnline: true,
+          lastActive,
+        });
+      } else {
+        user.isOnline = true;
+        user.lastActive = lastActive;
+      }
+    },
+    
+    
+    setUserOffline(userId: number) {
+      this.onlineUsers = this.onlineUsers.filter(
+        (u) => u.userId !== userId
+      );
     },
 
 

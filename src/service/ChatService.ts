@@ -41,8 +41,20 @@ export const ChatService = {
             throw new Error('Failed to fetch chat. Please try again later.');
         }
 
+    }
+    ,
+    markMessagesAsRead: async (chatId: number) : Promise<ApiResponse<void>> => {
+        try{
+            const response = await axiosInstance.put(`${API_URL}/read/${chatId}`)
+            return response.data;
+        } catch (error) {
+            console.error('lỗi không thể đọc được tin nhắn:', error);
+            throw new Error('Failed to fetch chat. Please try again later.');
+        }
 
     }
+
+
 
 
 

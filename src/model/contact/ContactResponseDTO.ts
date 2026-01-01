@@ -1,4 +1,3 @@
-
 export interface ContactResponseDTO {
   id: number;          // id của bạn bè
   fullName: string;    // tên bạn bè
